@@ -25,27 +25,43 @@ class DatabaseConnector:
                 log_error("Invalid connection parameters for SQL Server")
                 return None
 
-            # Create connection string based on authentication type
-            if connection_params.get('use_windows_auth', True):  # Default to Windows Auth
-                # Use server name and database name for Windows Auth
-                server = connection_params.get('server', connection_params.get('host'))
-                database = connection_params.get('database')
-                # Properly encode the driver string
-                driver = 'ODBC Driver 17 for SQL Server'
-                conn_str = (
-                    f"mssql+pyodbc://@{server}/{database}"
-                    f"?driver={driver.replace(' ', '+')}&trusted_connection=yes"
-                )
-            else:
-                driver = 'ODBC Driver 17 for SQL Server'
-                conn_str = (
-                    f"mssql+pyodbc://{connection_params['username']}:{connection_params['password']}"
-                    f"@{connection_params['host']}/{connection_params['database']}"
-                    f"?driver={driver.replace(' ', '+')}"
-                )
+            try:
+                # Get server name from either 'server' or 'host' parameter
+                server = connection_params.get('server') or connection_params.get('host')
+                if not server:
+                    raise ValueError("Server/Host is required")
 
-            # Create engine and execute query
-            engine = create_engine(conn_str, fast_executemany=True)
+                database = connection_params.get('database')
+                if not database:
+                    raise ValueError("Database name is required")
+
+                # Build connection string based on authentication type
+                if connection_params.get('use_windows_auth', True):
+                    conn_str = (
+                        f"Driver={{ODBC Driver 17 for SQL Server}};"
+                        f"Server={server};"
+                        f"Database={database};"
+                        "Trusted_Connection=yes"
+                    )
+                else:
+                    username = connection_params.get('username')
+                    password = connection_params.get('password')
+                    if not username or not password:
+                        raise ValueError("Username and password are required for SQL authentication")
+
+                    conn_str = (
+                        f"Driver={{ODBC Driver 17 for SQL Server}};"
+                        f"Server={server};"
+                        f"Database={database};"
+                        f"Uid={username};"
+                        f"Pwd={password}"
+                    )
+
+                # Create engine using the pyodbc connection string
+                engine = create_engine(
+                    f"mssql+pyodbc:///?odbc_connect={conn_str}",
+                    fast_executemany=True
+                )
             with engine.connect() as connection:
                 df = pd.read_sql(text(query), connection)
                 return df
@@ -108,30 +124,40 @@ class DatabaseConnector:
                 log_error("Invalid connection parameters for stored procedure execution")
                 return None
 
-            # Create connection string for SQL Server based on authentication type
-            if connection_params.get('use_windows_auth', True):  # Default to Windows Auth
-                # Use server name and database name for Windows Auth
-                server = connection_params.get('server', connection_params.get('host'))
-                database = connection_params.get('database')
-                driver = 'ODBC Driver 17 for SQL Server'
-                conn_str = (
-                    f"Driver={{{driver}}};"
-                    f"Server={server};"
-                    f"Database={database};"
-                    "Trusted_Connection=yes"
-                )
-            else:
-                driver = 'ODBC Driver 17 for SQL Server'
-                conn_str = (
-                    f"Driver={{{driver}}};"
-                    f"Server={connection_params['host']};"
-                    f"Database={connection_params['database']};"
-                    f"Uid={connection_params['username']};"
-                    f"Pwd={connection_params['password']}"
-                )
+            try:
+                # Get server name from either 'server' or 'host' parameter
+                server = connection_params.get('server') or connection_params.get('host')
+                if not server:
+                    raise ValueError("Server/Host is required")
 
-            # Connect and execute stored procedure
-            with pyodbc.connect(conn_str) as conn:
+                database = connection_params.get('database')
+                if not database:
+                    raise ValueError("Database name is required")
+
+                # Build connection string based on authentication type
+                if connection_params.get('use_windows_auth', True):
+                    conn_str = (
+                        f"Driver={{ODBC Driver 17 for SQL Server}};"
+                        f"Server={server};"
+                        f"Database={database};"
+                        "Trusted_Connection=yes"
+                    )
+                else:
+                    username = connection_params.get('username')
+                    password = connection_params.get('password')
+                    if not username or not password:
+                        raise ValueError("Username and password are required for SQL authentication")
+
+                    conn_str = (
+                        f"Driver={{ODBC Driver 17 for SQL Server}};"
+                        f"Server={server};"
+                        f"Database={database};"
+                        f"Uid={username};"
+                        f"Pwd={password}"
+                    )
+
+                # Connect and execute stored procedure
+                with pyodbc.connect(conn_str) as conn:
                 cursor = conn.cursor()
                 
                 if params:
@@ -171,29 +197,46 @@ class DatabaseConnector:
                 return False
 
             if db_type.lower() == 'sqlserver':
-                if connection_params.get('use_windows_auth', True):  # Default to Windows Auth
-                    # Use server name and database name for Windows Auth
-                    server = connection_params.get('server', connection_params.get('host'))
+                try:
+                    # Get server name from either 'server' or 'host' parameter
+                    server = connection_params.get('server') or connection_params.get('host')
+                    if not server:
+                        raise ValueError("Server/Host is required")
+
                     database = connection_params.get('database')
-                    driver = 'ODBC Driver 17 for SQL Server'
-                    conn_str = (
-                        f"Driver={{{driver}}};"
-                        f"Server={server};"
-                        f"Database={database};"
-                        "Trusted_Connection=yes"
-                    )
-                else:
-                    driver = 'ODBC Driver 17 for SQL Server'
-                    conn_str = (
-                        f"Driver={{{driver}}};"
-                        f"Server={connection_params['host']};"
-                        f"Database={connection_params['database']};"
-                        f"Uid={connection_params['username']};"
-                        f"Pwd={connection_params['password']}"
-                    )
-                conn = pyodbc.connect(conn_str)
-                conn.close()
-                return True
+                    if not database:
+                        raise ValueError("Database name is required")
+
+                    # Build connection string based on authentication type
+                    if connection_params.get('use_windows_auth', True):
+                        conn_str = (
+                            f"Driver={{ODBC Driver 17 for SQL Server}};"
+                            f"Server={server};"
+                            f"Database={database};"
+                            "Trusted_Connection=yes"
+                        )
+                    else:
+                        username = connection_params.get('username')
+                        password = connection_params.get('password')
+                        if not username or not password:
+                            raise ValueError("Username and password are required for SQL authentication")
+
+                        conn_str = (
+                            f"Driver={{ODBC Driver 17 for SQL Server}};"
+                            f"Server={server};"
+                            f"Database={database};"
+                            f"Uid={username};"
+                            f"Pwd={password}"
+                        )
+
+                    # Test connection
+                    conn = pyodbc.connect(conn_str)
+                    conn.close()
+                    return True
+
+                except Exception as e:
+                    log_error(f"SQL Server connection test failed: {str(e)}")
+                    return False
 
             elif db_type.lower() == 'teradata':
                 conn = teradatasql.connect(
