@@ -67,17 +67,40 @@ def validate_connection_params(params: dict) -> bool:
     Returns:
         bool: True if parameters are valid, False otherwise
     """
-    # Basic required parameters for all connections
-    basic_params = ['host', 'database']
-    
-    # Check if using Windows Authentication
-    if params.get('use_windows_auth', True):
-        # Only host and database are required for Windows Auth
-        return all(param in params for param in basic_params)
-    else:
-        # Username and password required for SQL authentication
-        sql_auth_params = basic_params + ['username', 'password']
-        return all(param in params for param in sql_auth_params)
+    try:
+        if not isinstance(params, dict):
+            log_error("Connection parameters must be a dictionary")
+            return False
+
+        # Check if using Windows Authentication
+        if params.get('use_windows_auth', True):
+            # For Windows Auth, we need either host or server, and database
+            if not params.get('database'):
+                log_error("Database name is required")
+                return False
+            
+            if not (params.get('host') or params.get('server')):
+                log_error("Server/Host is required")
+                return False
+            
+            return True
+        else:
+            # For SQL Auth, we need host/server, database, username, and password
+            required_params = ['database', 'username', 'password']
+            if not (params.get('host') or params.get('server')):
+                log_error("Server/Host is required")
+                return False
+                
+            for param in required_params:
+                if not params.get(param):
+                    log_error(f"{param} is required for SQL Authentication")
+                    return False
+            
+            return True
+            
+    except Exception as e:
+        log_error(f"Error validating connection parameters: {str(e)}")
+        return False
 
 def sanitize_filename(filename: str) -> str:
     """
