@@ -1,0 +1,25 @@
+# Core dependencies
+streamlit>=1.24.0
+pandas>=1.5.0
+numpy>=1.23.0
+dask>=2023.3.0
+
+# Database connectors
+pyodbc>=4.0.35
+teradatasql>=17.20.0.0
+
+# File handling
+openpyxl>=3.1.0
+pyarrow>=12.0.1
+fastparquet>=2023.4.0
+
+# Data comparison and profiling
+datacompy>=0.8.0
+ydata-profiling>=4.5.0
+
+# Utilities
+requests>=2.31.0
+python-dateutil>=2.8.2
+
+# Excel styling
+XlsxWriter>=3.1.0
