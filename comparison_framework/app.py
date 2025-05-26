@@ -53,17 +53,24 @@ def show_data_source_config(prefix: str) -> None:
                     
                     if st.button(f"Load {source_type}", key=f"load_{prefix}"):
                         with st.spinner("Loading data..."):
-                            if source_type == 'Zipped Flat Files':
-                                df = DataLoader.read_zipped_flat_files(io.BytesIO(file.read()), delimiter)
-                            else:
-                                # Save uploaded file temporarily
-                                with tempfile.NamedTemporaryFile(delete=False) as tmp:
-                                    tmp.write(file.read())
-                                    if source_type == 'CSV File':
-                                        df = DataLoader.read_csv_in_chunks(tmp.name, delimiter)
-                                    else:  # DAT File
-                                        df = DataLoader.read_dat_file(tmp.name, delimiter)
-                                os.unlink(tmp.name)  # Clean up temp file
+                            try:
+                                # Reset file pointer
+                                file.seek(0)
+                                
+                                if source_type == 'Zipped Flat Files':
+                                    df = DataLoader.read_zipped_flat_files(io.BytesIO(file.read()), delimiter)
+                                elif source_type == 'CSV File':
+                                    df = DataLoader.read_csv_in_chunks(file, delimiter=delimiter)
+                                else:  # DAT File
+                                    df = DataLoader.read_dat_file(file, delimiter=delimiter)
+                                
+                                if df is not None and len(df) > 0:
+                                    st.session_state[f"{prefix}_df"] = df
+                                    st.success(f"✅ Successfully loaded {len(df)} rows and {len(df.columns)} columns")
+                                else:
+                                    st.error("❌ No data was loaded from the file")
+                            except Exception as e:
+                                st.error(f"❌ Error loading file: {str(e)}")
                                 
                 elif source_type == 'Parquet File':
                     if st.button(f"Load {source_type}", key=f"load_{prefix}"):
@@ -278,33 +285,37 @@ def show_join_column_selection():
     if not st.session_state.column_mapping:
         st.warning("⚠️ Please map columns first")
         return
-        
-    # Get mapped columns
-    mapped_columns = list(st.session_state.column_mapping.items())
     
-    # Allow multiple join column selection
-    selected_joins = []
-    for i in range(len(mapped_columns)):
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            source_col = st.selectbox(
-                f"Source Join Column {i+1}",
-                options=[''] + [col[0] for col in mapped_columns],
-                key=f"source_join_{i}"
-            )
-        
-        with col2:
-            if source_col:
-                target_col = st.session_state.column_mapping.get(source_col, '')
-                st.write(f"Target Join Column: {target_col}")
-                if source_col and target_col:
-                    selected_joins.append((source_col, target_col))
+    # Initialize join_columns in session state if not present
+    if 'join_columns' not in st.session_state:
+        st.session_state.join_columns = []
     
-    st.session_state.join_columns = selected_joins
+    # Get valid columns that exist in both dataframes
+    valid_columns = [
+        col for col in st.session_state.column_mapping.keys()
+        if col in st.session_state.source_df.columns and 
+        st.session_state.column_mapping[col] in st.session_state.target_df.columns
+    ]
     
-    if selected_joins:
-        st.success(f"✅ Selected {len(selected_joins)} join column pairs")
+    # Show multiselect for join columns
+    selected_columns = st.multiselect(
+        "Select columns to use as join keys",
+        options=valid_columns,
+        default=st.session_state.join_columns,
+        help="Select one or more columns to use as join keys for comparison"
+    )
+    
+    # Update session state
+    st.session_state.join_columns = selected_columns
+    
+    if selected_columns:
+        st.success(f"✅ Selected {len(selected_columns)} join column(s)")
+        # Show selected mappings
+        st.write("Selected Join Keys:")
+        for col in selected_columns:
+            st.write(f"- Source: {col} → Target: {st.session_state.column_mapping[col]}")
+    else:
+        st.info("ℹ️ No join columns selected. Index-based comparison will be used.")
 
 def perform_comparison():
     """Perform the comparison and generate reports"""
@@ -326,14 +337,16 @@ def perform_comparison():
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
         with st.spinner("Generating reports..."):
-            # Generate DataCompy report
-            datacompy_path = os.path.join(REPORTS_DIR, f"DataCompyReport_{timestamp}.html")
-            ReportGenerator.generate_datacompy_report(
+            # Generate comparison report
+            comparison_path = os.path.join(REPORTS_DIR, f"ComparisonReport_{timestamp}.html")
+            # Use join columns directly as a list of strings
+            join_keys = list(st.session_state.join_columns) if st.session_state.join_columns else []
+            ReportGenerator.generate_comparison_report(
                 st.session_state.source_df,
                 st.session_state.target_df,
                 st.session_state.column_mapping,
-                st.session_state.join_columns,
-                datacompy_path
+                join_keys,
+                comparison_path
             )
             
             # Generate Y-Data Profile reports
@@ -369,11 +382,11 @@ def perform_comparison():
             col1, col2 = st.columns(2)
             
             with col1:
-                with open(datacompy_path, 'rb') as f:
+                with open(comparison_path, 'rb') as f:
                     st.download_button(
-                        "📊 Download DataCompy Report",
+                        "📊 Download Comparison Report",
                         f,
-                        file_name=f"DataCompyReport_{timestamp}.html",
+                        file_name=f"ComparisonReport_{timestamp}.html",
                         mime="text/html"
                     )
                     
