@@ -12,20 +12,49 @@ from config import CHUNK_SIZE
 
 class DataLoader:
     @staticmethod
-    def read_csv_in_chunks(file_path: str, delimiter: str = ',', **kwargs) -> pd.DataFrame:
+    def read_csv_in_chunks(file_obj: Any, delimiter: str = ',', **kwargs) -> pd.DataFrame:
         """Read large CSV files in chunks"""
         try:
-            # Use Dask for large files
-            ddf = dd.read_csv(file_path, blocksize=CHUNK_SIZE, delimiter=delimiter, **kwargs)
-            return ddf.compute()
+            # Try different encodings
+            encodings = ['utf-8', 'latin1', 'iso-8859-1', 'cp1252']
+            
+            for encoding in encodings:
+                try:
+                    # For uploaded files
+                    if hasattr(file_obj, 'read'):
+                        # Reset file pointer
+                        file_obj.seek(0)
+                        # Try reading with pandas first for smaller files
+                        try:
+                            return pd.read_csv(file_obj, delimiter=delimiter, encoding=encoding, **kwargs)
+                        except Exception:
+                            # If that fails, use Dask for larger files
+                            file_obj.seek(0)
+                            ddf = dd.read_csv(file_obj, blocksize=CHUNK_SIZE, delimiter=delimiter, encoding=encoding, **kwargs)
+                            return ddf.compute()
+                    # For file paths
+                    else:
+                        try:
+                            return pd.read_csv(file_obj, delimiter=delimiter, encoding=encoding, **kwargs)
+                        except Exception:
+                            ddf = dd.read_csv(file_obj, blocksize=CHUNK_SIZE, delimiter=delimiter, encoding=encoding, **kwargs)
+                            return ddf.compute()
+                except UnicodeDecodeError:
+                    continue
+                except Exception as e:
+                    if encoding == encodings[-1]:  # If this was the last encoding to try
+                        raise e
+                    continue
+            
+            raise Exception("Unable to read file with any supported encoding")
         except Exception as e:
             raise Exception(f"Error reading CSV file: {str(e)}")
 
     @staticmethod
-    def read_dat_file(file_path: str, delimiter: str = '|', **kwargs) -> pd.DataFrame:
+    def read_dat_file(file_obj: Any, delimiter: str = '|', **kwargs) -> pd.DataFrame:
         """Read DAT files"""
         try:
-            return DataLoader.read_csv_in_chunks(file_path, delimiter=delimiter, **kwargs)
+            return DataLoader.read_csv_in_chunks(file_obj, delimiter=delimiter, **kwargs)
         except Exception as e:
             raise Exception(f"Error reading DAT file: {str(e)}")
 
