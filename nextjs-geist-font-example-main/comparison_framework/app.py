@@ -37,57 +37,185 @@ SOURCE_TYPES = [
 def main():
     """Main application function"""
     
-    # Add header with modern styling
+    # Add modern header with enhanced styling
     st.markdown(
         """
-        <div style='text-align: center; background-color: #f0f2f6; padding: 1rem; border-radius: 10px;'>
-            <h1 style='color: #1f77b4;'>Data Comparison Framework</h1>
-            <p style='color: #666;'>Compare data from multiple sources with advanced mapping and reporting capabilities</p>
+        <div style='text-align: center; background-color: #f8f9fa; padding: 2rem; 
+             border-radius: 10px; margin-bottom: 2rem; border: 1px solid #dee2e6;'>
+            <h1 style='color: #1f77b4; margin-bottom: 0.5rem; font-size: 2.5em;'>
+                Data Comparison Framework
+            </h1>
+            <p style='color: #6c757d; font-size: 1.1em; margin: 1rem 0;'>
+                Compare data between SQL Server databases and feed files with advanced mapping capabilities
+            </p>
+            <div style='display: flex; justify-content: center; gap: 1rem; margin-top: 1rem;'>
+                <div style='background-color: #e8f4f8; padding: 0.5rem 1rem; border-radius: 5px;'>
+                    <span style='color: #1f77b4;'>✨ Automatic Column Mapping</span>
+                </div>
+                <div style='background-color: #e8f4f8; padding: 0.5rem 1rem; border-radius: 5px;'>
+                    <span style='color: #1f77b4;'>🔍 Smart Join Detection</span>
+                </div>
+                <div style='background-color: #e8f4f8; padding: 0.5rem 1rem; border-radius: 5px;'>
+                    <span style='color: #1f77b4;'>📊 Detailed Reports</span>
+                </div>
+            </div>
         </div>
         """,
         unsafe_allow_html=True
     )
 
-    # Initialize session state variables
-    if 'source_df' not in st.session_state:
-        st.session_state.source_df = None
-    if 'target_df' not in st.session_state:
-        st.session_state.target_df = None
-    if 'column_mapping' not in st.session_state:
-        st.session_state.column_mapping = {}
-    if 'excluded_columns' not in st.session_state:
-        st.session_state.excluded_columns = []
-    if 'report_paths' not in st.session_state:
-        st.session_state.report_paths = {}
+    # Add error handling for the entire app
+    try:
 
-    # Create two columns for source and target selection
-    col1, col2 = st.columns(2)
+        # Initialize session state variables
+        if 'source_df' not in st.session_state:
+            st.session_state.source_df = None
+        if 'target_df' not in st.session_state:
+            st.session_state.target_df = None
+        if 'column_mapping' not in st.session_state:
+            st.session_state.column_mapping = {}
+        if 'excluded_columns' not in st.session_state:
+            st.session_state.excluded_columns = []
+        if 'report_paths' not in st.session_state:
+            st.session_state.report_paths = {}
 
-    with col1:
-        st.subheader("Source Configuration")
-        source_type = st.selectbox("Select Source Type", SOURCE_TYPES, key="source_type")
-        source_data = handle_data_source(source_type, "source")
+        # Create two columns for source and target selection with enhanced styling
+        st.markdown(
+            """
+            <div style='display: flex; gap: 2rem; margin: 1rem 0;'>
+                <div style='flex: 1; background-color: #f8f9fa; padding: 1.5rem; border-radius: 10px; border: 1px solid #dee2e6;'>
+                    <h3 style='margin: 0 0 1rem 0; color: #1f77b4;'>Source Configuration</h3>
+                    <p style='color: #6c757d; margin-bottom: 1rem;'>Select and configure your source data</p>
+                </div>
+                <div style='flex: 1; background-color: #f8f9fa; padding: 1.5rem; border-radius: 10px; border: 1px solid #dee2e6;'>
+                    <h3 style='margin: 0 0 1rem 0; color: #1f77b4;'>Target Configuration</h3>
+                    <p style='color: #6c757d; margin-bottom: 1rem;'>Select and configure your target data</p>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
-    with col2:
-        st.subheader("Target Configuration")
-        target_type = st.selectbox("Select Target Type", SOURCE_TYPES, key="target_type")
-        target_data = handle_data_source(target_type, "target")
+        col1, col2 = st.columns(2)
 
-    # If both source and target data are loaded
-    if source_data is not None and target_data is not None:
-        st.session_state.source_df = source_data
-        st.session_state.target_df = target_data
-        
-        # Initialize or update column mapping
-        if not st.session_state.column_mapping:
-            st.session_state.column_mapping = MappingManager.auto_map_columns(source_data, target_data)
+        with col1:
+            source_type = st.selectbox(
+                "Select Source Type",
+                SOURCE_TYPES,
+                key="source_type",
+                help="Choose the type of source data you want to compare"
+            )
+            source_data = handle_data_source(source_type, "source")
+            if source_data is not None:
+                st.success(f"✅ Source data loaded successfully: {len(source_data)} rows, {len(source_data.columns)} columns")
+
+        with col2:
+            target_type = st.selectbox(
+                "Select Target Type",
+                SOURCE_TYPES,
+                key="target_type",
+                help="Choose the type of target data you want to compare"
+            )
+            target_data = handle_data_source(target_type, "target")
+            if target_data is not None:
+                st.success(f"✅ Target data loaded successfully: {len(target_data)} rows, {len(target_data.columns)} columns")
+
+    except Exception as e:
+        st.error(f"❌ An error occurred: {str(e)}")
+        log_error(f"Application error: {str(e)}")
+        return
+
+    # Check if we have data either from direct loading or session state
+    if ((source_data is not None and target_data is not None) or 
+        (isinstance(st.session_state.source_df, pd.DataFrame) and isinstance(st.session_state.target_df, pd.DataFrame))):
+        try:
+            # Get data from direct load or session state
+            from utils import clean_df_columns
+            
+            # Validate and prepare source data
+            source_df = source_data if source_data is not None else st.session_state.get('source_df')
+            if not isinstance(source_df, pd.DataFrame):
+                st.error("❌ Source data is not available or invalid. Please load source data first.")
+                return
+            
+            # Convert all columns to string type for consistent comparison
+            source_df = source_df.astype(str)
+            
+            # Validate and prepare target data
+            target_df = target_data if target_data is not None else st.session_state.get('target_df')
+            if not isinstance(target_df, pd.DataFrame):
+                st.error("❌ Target data is not available or invalid. Please load target data first.")
+                return
+            
+            # Convert all columns to string type for consistent comparison
+            target_df = target_df.astype(str)
+            
+            try:
+                # Normalize columns for consistent mapping
+                cleaned_source = clean_df_columns(source_df)
+                cleaned_target = clean_df_columns(target_df)
+                
+                if cleaned_source.empty or cleaned_target.empty:
+                    st.error("❌ One or both datasets are empty. Please check your data.")
+                    return
+                
+                # Reset index to ensure consistent comparison
+                cleaned_source = cleaned_source.reset_index(drop=True)
+                cleaned_target = cleaned_target.reset_index(drop=True)
+            except Exception as e:
+                st.error(f"❌ Error cleaning data: {str(e)}")
+                return
+            
+            # Store cleaned DataFrames in session state if they came from direct load
+            if source_data is not None:
+                st.session_state.source_df = cleaned_source
+            if target_data is not None:
+                st.session_state.target_df = cleaned_target
+            
+            # Debug information
+            st.write("Source columns:", list(cleaned_source.columns))
+            st.write("Target columns:", list(cleaned_target.columns))
+            
+            # Force re-mapping if source columns have changed
+            current_source_cols = list(cleaned_source.columns)
+            if (not st.session_state.get('column_mapping') or 
+                st.session_state.get('last_source_columns') != current_source_cols):
+                
+                # Clean column names before mapping
+                cleaned_source.columns = [col.strip().lower() for col in cleaned_source.columns]
+                cleaned_target.columns = [col.strip().lower() for col in cleaned_target.columns]
+                
+                st.session_state.column_mapping = MappingManager.auto_map_columns(cleaned_source, cleaned_target)
+                st.session_state.last_source_columns = current_source_cols
+                
+                # Debug mapping results
+                st.write("Mapped columns:", st.session_state.column_mapping)
+                
+                if st.session_state.column_mapping:
+                    st.success(f"✅ Successfully mapped {len(st.session_state.column_mapping)} columns automatically!")
+                else:
+                    st.warning("⚠️ No automatic column mappings found. Please map columns manually below.")
+        except Exception as e:
+            st.error(f"❌ Error initializing data: {str(e)}")
+            log_error(f"Data initialization error: {str(e)}")
+            return
 
         # Show column mapping interface
         st.subheader("Column Mapping")
         show_column_mapping_interface(source_data, target_data)
 
-        # Add join key selection based on mapped columns
-        st.subheader("Join Key Selection")
+        # Add join key selection with enhanced styling
+        st.markdown(
+            """
+            <div style='background-color: #f8f9fa; padding: 1.5rem; border-radius: 10px; margin: 2rem 0; border: 1px solid #dee2e6;'>
+                <h3 style='margin: 0; color: #1f77b4;'>Join Key Selection</h3>
+                <p style='margin: 0.5rem 0 0 0; color: #6c757d;'>
+                    Select columns to use as join keys for comparing records between source and target data.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
         
         # Get mapped columns (where source and target are mapped)
         mapped_columns = {source_col: target_col 
@@ -95,53 +223,78 @@ def main():
                         if source_col in source_data.columns and target_col in target_data.columns}
         
         if not mapped_columns:
-            st.warning("No mapped columns available for join keys. Please map columns first.")
+            st.warning("⚠️ No mapped columns available for join keys. Please map at least one column first.")
             join_keys = None
         else:
-            # Show mapped columns available for joining
-            st.write("Mapped columns available for joining:")
-            mapped_preview = []
-            for source_col, target_col in mapped_columns.items():
-                st.write(f"- Source: {source_col} → Target: {target_col}")
-                # Get sample values
-                source_sample = source_data[source_col].head(3).tolist()
-                target_sample = target_data[target_col].head(3).tolist()
-                mapped_preview.append({
-                    'Source Column': source_col,
-                    'Target Column': target_col,
-                    'Source Sample': str(source_sample),
-                    'Target Sample': str(target_sample)
-                })
+            # Create columns for join key selection and preview
+            col1, col2 = st.columns([1, 2])
             
-            # Show preview of mapped columns
-            if mapped_preview:
-                st.write("Preview of mapped columns:")
-                st.dataframe(pd.DataFrame(mapped_preview))
+            with col1:
+                # Select join keys from mapped columns with enhanced styling
+                st.markdown("##### Select Join Key Columns")
+                selected_keys = st.multiselect(
+                    "Choose columns that uniquely identify records",
+                    options=list(mapped_columns.keys()),
+                    help="These columns will be used to match records between source and target data"
+                )
+                
+                if selected_keys:
+                    join_keys = [(source_col, mapped_columns[source_col]) for source_col in selected_keys]
+                    st.markdown(
+                        """
+                        <div style='background-color: #e8f4f8; padding: 0.75rem; border-radius: 5px; margin-top: 1rem;'>
+                            <p style='margin: 0; color: #1f77b4;'>Selected Join Keys:</p>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+                    for source_col, target_col in join_keys:
+                        st.markdown(f"- {source_col} → {target_col}")
+                else:
+                    st.info("ℹ️ No join keys selected. Comparison will be done row by row.")
+                    join_keys = None
             
-            # Select join keys from mapped columns
-            selected_keys = st.multiselect(
-                "Select Join Key(s)",
-                options=list(mapped_columns.keys()),
-                help="Select one or more mapped columns to use as join keys for comparison. These columns should uniquely identify records."
-            )
-            
-            if selected_keys:
-                # Create the join keys mapping (source to target columns)
-                join_keys = [(source_col, mapped_columns[source_col]) for source_col in selected_keys]
-                st.write("Selected join keys:")
-                for source_col, target_col in join_keys:
-                    st.write(f"- {source_col} → {target_col}")
-            else:
-                st.warning("No join keys selected. Comparison will be done row by row.")
-                join_keys = None
+            with col2:
+                # Show preview of mapped columns with samples
+                st.markdown("##### Join Keys Preview")
+                mapped_preview = []
+                for source_col, target_col in mapped_columns.items():
+                    source_sample = source_data[source_col].head(3).tolist()
+                    target_sample = target_data[target_col].head(3).tolist()
+                    mapped_preview.append({
+                        'Source Column': source_col,
+                        'Target Column': target_col,
+                        'Source Sample': str(source_sample),
+                        'Target Sample': str(target_sample)
+                    })
+                
+                if mapped_preview:
+                    st.dataframe(
+                        pd.DataFrame(mapped_preview),
+                        use_container_width=True,
+                        height=200
+                    )
 
         # Store join keys in session state
         st.session_state.join_keys = join_keys
 
-        # Compare button
-        if st.button("Compare Data", type="primary"):
-            with st.spinner("Generating comparison reports..."):
-                perform_comparison()
+        # Compare button section with enhanced styling
+        st.markdown(
+            """
+            <div style='background-color: #f8f9fa; padding: 1.5rem; border-radius: 10px; margin: 2rem 0; 
+                 border: 1px solid #dee2e6; text-align: center;'>
+                <h3 style='margin: 0 0 1rem 0; color: #1f77b4;'>Generate Comparison Reports</h3>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        # Center the compare button
+        col1, col2, col3 = st.columns([2, 1, 2])
+        with col2:
+            if st.button("🔄 Compare Data", type="primary", use_container_width=True):
+                with st.spinner("Generating comparison reports..."):
+                    perform_comparison()
 
 def handle_data_source(source_type: str, prefix: str) -> Optional[pd.DataFrame]:
     """Handle different types of data sources"""
@@ -161,54 +314,197 @@ def handle_data_source(source_type: str, prefix: str) -> Optional[pd.DataFrame]:
     return None
 
 def handle_file_upload(file_type: str, prefix: str) -> Optional[pd.DataFrame]:
-    """Handle file upload for different file types"""
+    """Handle file upload for different file types with enhanced UI and error handling"""
     
-    uploaded_file = st.file_uploader(f"Upload {file_type}", key=f"{prefix}_file")
+    # Add file upload UI with modern styling
+    st.markdown(
+        f"""
+        <div style='background-color: #f8f9fa; padding: 1.5rem; border-radius: 10px; margin-bottom: 1rem; border: 1px solid #dee2e6;'>
+            <h4 style='margin: 0; color: #1f77b4;'>{file_type} Upload</h4>
+            <p style='margin: 0.5rem 0 0 0; color: #6c757d;'>
+                Upload your {file_type.lower()} and configure import settings below.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    
+    # File upload section
+    uploaded_file = st.file_uploader(
+        f"Choose {file_type}",
+        key=f"{prefix}_file",
+        help=f"Select a {file_type.lower()} to upload"
+    )
     
     if uploaded_file:
-        delimiter = st.text_input(f"Delimiter (for {file_type})", 
-                                value=',' if file_type == "CSV File" else '|',
-                                key=f"{prefix}_delimiter")
-        
         try:
-            if file_type == "CSV File":
-                return DataReader.load_csv(uploaded_file, delimiter=delimiter)
-            elif file_type == "DAT File":
-                return DataReader.load_dat(uploaded_file, delimiter=delimiter)
-            elif file_type == "Parquet File":
-                return DataReader.load_parquet(uploaded_file)
-            elif file_type == "Zipped Flat Files":
-                return DataReader.load_zipped_flat_files(uploaded_file, separator=delimiter)
+            # Show file info
+            file_details = {
+                "Filename": uploaded_file.name,
+                "File size": f"{uploaded_file.size / 1024:.2f} KB",
+                "File type": uploaded_file.type
+            }
+            
+            st.markdown("##### File Details")
+            for key, value in file_details.items():
+                st.text(f"{key}: {value}")
+            
+            # Configuration options based on file type
+            with st.expander("Import Configuration", expanded=True):
+                if file_type in ["CSV File", "DAT File"]:
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        delimiter = st.text_input(
+                            "Delimiter",
+                            value=',' if file_type == "CSV File" else '|',
+                            key=f"{prefix}_delimiter",
+                            help="Enter the character used to separate columns"
+                        )
+                    with col2:
+                        encoding = st.selectbox(
+                            "File Encoding",
+                            ["utf-8", "latin1", "ascii"],
+                            key=f"{prefix}_encoding",
+                            help="Select the file encoding"
+                        )
+            
+            # Load the file with progress indicator
+            with st.spinner(f"Loading {file_type}..."):
+                if file_type == "CSV File":
+                    df = DataReader.load_csv(uploaded_file, delimiter=delimiter)
+                elif file_type == "DAT File":
+                    df = DataReader.load_dat(uploaded_file, delimiter=delimiter)
+                elif file_type == "Parquet File":
+                    df = DataReader.load_parquet(uploaded_file)
+                elif file_type == "Zipped Flat Files":
+                    df = DataReader.load_zipped_flat_files(uploaded_file, separator=delimiter)
+                
+                if df is not None:
+                    st.success(f"✅ {file_type} loaded successfully!")
+                    st.info(f"Retrieved {len(df)} rows and {len(df.columns)} columns")
+                    
+                    # Show data preview in an expander
+                    with st.expander("Data Preview"):
+                        st.dataframe(
+                            df.head(5),
+                            use_container_width=True,
+                            height=200
+                        )
+                    return df
+                else:
+                    st.error(f"❌ Failed to load {file_type}. Please check the file format and try again.")
                 
         except Exception as e:
-            st.error(f"Error reading {file_type}: {str(e)}")
+            st.error(f"❌ Error reading {file_type}: {str(e)}")
+            log_error(f"File upload error ({file_type}): {str(e)}")
+            
+            # Show detailed error message in an expander
+            with st.expander("Error Details"):
+                st.code(str(e))
     
     return None
 
 def handle_database_connection(db_type: str, prefix: str) -> Optional[pd.DataFrame]:
-    """Handle database connections"""
+    """Handle database connections with enhanced UI and error handling"""
     
-    with st.expander(f"{db_type} Connection Details"):
-        host = st.text_input("Host", key=f"{prefix}_host")
-        database = st.text_input("Database", key=f"{prefix}_database")
+    # Add database connection UI with modern styling
+    st.markdown(
+        f"""
+        <div style='background-color: #f8f9fa; padding: 1.5rem; border-radius: 10px; margin-bottom: 1rem; border: 1px solid #dee2e6;'>
+            <h4 style='margin: 0; color: #1f77b4;'>{db_type} Connection</h4>
+            <p style='margin: 0.5rem 0 0 0; color: #6c757d;'>
+                Enter your {db_type} connection details below. Column names will be automatically standardized for better mapping.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    
+    # Create tabs for connection and query
+    conn_tab, query_tab = st.tabs(["Connection Details", "Query Configuration"])
+    
+    with conn_tab:
+        # Connection details with improved layout
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            host = st.text_input(
+                "Server/Host",
+                key=f"{prefix}_host",
+                help="Enter the server name or IP address"
+            )
+        
+        with col2:
+            database = st.text_input(
+                "Database",
+                key=f"{prefix}_database",
+                help="Enter the database name"
+            )
+        
+        # Authentication section
+        st.markdown("##### Authentication")
         
         if db_type in ["SQL Server", "Stored Procedure"]:
-            use_windows_auth = st.checkbox("Use Windows Authentication", value=True, key=f"{prefix}_use_windows_auth")
+            use_windows_auth = st.checkbox(
+                "Use Windows Authentication",
+                value=True,
+                key=f"{prefix}_use_windows_auth",
+                help="Check to use Windows Authentication, uncheck for SQL Authentication"
+            )
+            
             if not use_windows_auth:
-                username = st.text_input("Username", key=f"{prefix}_username")
-                password = st.text_input("Password", type="password", key=f"{prefix}_password")
+                col1, col2 = st.columns(2)
+                with col1:
+                    username = st.text_input(
+                        "Username",
+                        key=f"{prefix}_username",
+                        help="Enter your SQL Server username"
+                    )
+                with col2:
+                    password = st.text_input(
+                        "Password",
+                        type="password",
+                        key=f"{prefix}_password",
+                        help="Enter your SQL Server password"
+                    )
         else:
             use_windows_auth = False
-            username = st.text_input("Username", key=f"{prefix}_username")
-            password = st.text_input("Password", type="password", key=f"{prefix}_password")
-        
+            col1, col2 = st.columns(2)
+            with col1:
+                username = st.text_input(
+                    "Username",
+                    key=f"{prefix}_username"
+                )
+            with col2:
+                password = st.text_input(
+                    "Password",
+                    type="password",
+                    key=f"{prefix}_password"
+                )
+    
+    with query_tab:
         if db_type == "Stored Procedure":
-            proc_name = st.text_input("Stored Procedure Name", key=f"{prefix}_proc")
-            params = st.text_area("Parameters (JSON format)", key=f"{prefix}_params")
+            proc_name = st.text_input(
+                "Stored Procedure Name",
+                key=f"{prefix}_proc",
+                help="Enter the name of the stored procedure"
+            )
+            params = st.text_area(
+                "Parameters (JSON format)",
+                key=f"{prefix}_params",
+                help="Enter parameters as JSON, e.g., {\"param1\": \"value1\"}"
+            )
         else:
-            query = st.text_area("SQL Query", key=f"{prefix}_query")
-
-        if st.button("Connect", key=f"{prefix}_connect"):
+            query = st.text_area(
+                "SQL Query",
+                key=f"{prefix}_query",
+                height=150,
+                help="Enter your SQL query here. The query will be executed to fetch the data."
+            )
+    
+    # Connection button with loading state
+    if st.button("🔌 Connect to Database", key=f"{prefix}_connect", use_container_width=True):
+        with st.spinner(f"Connecting to {db_type}..."):
             try:
                 # Build connection parameters
                 conn_params = {
@@ -219,139 +515,404 @@ def handle_database_connection(db_type: str, prefix: str) -> Optional[pd.DataFra
                 
                 # Add username/password only if not using Windows Auth
                 if not (db_type in ["SQL Server", "Stored Procedure"] and use_windows_auth):
+                    if not username or not password:
+                        st.error("❌ Username and password are required for SQL Authentication")
+                        return None
                     conn_params.update({
                         'username': username,
                         'password': password
                     })
                 
+                # Validate connection parameters
+                if not host or not database:
+                    st.error("❌ Server/Host and Database are required")
+                    return None
+                
+                # Execute query based on database type
                 if db_type == "SQL Server":
-                    return DatabaseConnector.get_sqlserver_data(conn_params, query)
+                    if not query:
+                        st.error("❌ SQL Query is required")
+                        return None
+                    try:
+                        df = DatabaseConnector.get_sqlserver_data(conn_params, query)
+                        if df is not None and isinstance(df, pd.DataFrame) and not df.empty:
+                            st.success("✅ SQL Server connection successful!")
+                            st.info(f"Retrieved {len(df)} rows and {len(df.columns)} columns")
+                            
+                            # Store DataFrame in session state
+                            if prefix == "source":
+                                st.session_state['source_df'] = df.copy()
+                            else:
+                                st.session_state['target_df'] = df.copy()
+                                
+                            # Verify the DataFrame was stored correctly
+                            stored_df = st.session_state.get('source_df' if prefix == "source" else 'target_df')
+                            if not isinstance(stored_df, pd.DataFrame):
+                                st.error("❌ Error storing DataFrame in session state")
+                                return None
+                                
+                            return df
+                        else:
+                            st.error("❌ No data returned from SQL Server or empty result")
+                            return None
+                    except Exception as e:
+                        st.error(f"❌ Error processing SQL Server data: {str(e)}")
+                        return None
+                
                 elif db_type == "Teradata":
-                    return DatabaseConnector.get_teradata_data(conn_params, query)
+                    if not query:
+                        st.error("❌ SQL Query is required")
+                        return None
+                    try:
+                        df = DatabaseConnector.get_teradata_data(conn_params, query)
+                        if df is not None and isinstance(df, pd.DataFrame) and not df.empty:
+                            st.success("✅ Teradata connection successful!")
+                            st.info(f"Retrieved {len(df)} rows and {len(df.columns)} columns")
+                            
+                            # Store DataFrame in session state
+                            if prefix == "source":
+                                st.session_state['source_df'] = df.copy()
+                            else:
+                                st.session_state['target_df'] = df.copy()
+                                
+                            # Verify the DataFrame was stored correctly
+                            stored_df = st.session_state.get('source_df' if prefix == "source" else 'target_df')
+                            if not isinstance(stored_df, pd.DataFrame):
+                                st.error("❌ Error storing DataFrame in session state")
+                                return None
+                                
+                            return df
+                        else:
+                            st.error("❌ No data returned from Teradata or empty result")
+                            return None
+                    except Exception as e:
+                        st.error(f"❌ Error processing Teradata data: {str(e)}")
+                        return None
+                
                 elif db_type == "Stored Procedure":
-                    return DatabaseConnector.get_data_from_stored_proc(
-                        conn_params, proc_name, eval(params) if params else None)
+                    if not proc_name:
+                        st.error("❌ Stored Procedure name is required")
+                        return None
+                    try:
+                        df = DatabaseConnector.get_data_from_stored_proc(
+                            conn_params, proc_name, eval(params) if params else None)
+                        if df is not None and isinstance(df, pd.DataFrame) and not df.empty:
+                            st.success("✅ Stored Procedure executed successfully!")
+                            st.info(f"Retrieved {len(df)} rows and {len(df.columns)} columns")
+                            
+                            # Store DataFrame in session state
+                            if prefix == "source":
+                                st.session_state['source_df'] = df.copy()
+                            else:
+                                st.session_state['target_df'] = df.copy()
+                                
+                            # Verify the DataFrame was stored correctly
+                            stored_df = st.session_state.get('source_df' if prefix == "source" else 'target_df')
+                            if not isinstance(stored_df, pd.DataFrame):
+                                st.error("❌ Error storing DataFrame in session state")
+                                return None
+                                
+                            return df
+                        else:
+                            st.error("❌ No data returned from Stored Procedure or empty result")
+                            return None
+                    except Exception as e:
+                        st.error(f"❌ Error processing Stored Procedure data: {str(e)}")
+                        return None
                         
             except Exception as e:
-                st.error(f"Database connection error: {str(e)}")
+                st.error(f"❌ Database connection error: {str(e)}")
+                log_error(f"Database connection error ({db_type}): {str(e)}")
     
     return None
 
 def handle_api_connection(prefix: str) -> Optional[pd.DataFrame]:
-    """Handle API connections"""
+    """Handle API connections with enhanced UI and error handling"""
     
-    with st.expander("API Connection Details"):
-        api_url = st.text_input("API URL", key=f"{prefix}_api_url")
-        method = st.selectbox("Method", ["GET", "POST"], key=f"{prefix}_method")
-        headers = st.text_area("Headers (JSON format)", key=f"{prefix}_headers")
-        params = st.text_area("Parameters (JSON format)", key=f"{prefix}_params")
+    # Add API connection UI with modern styling
+    st.markdown(
+        """
+        <div style='background-color: #f8f9fa; padding: 1.5rem; border-radius: 10px; margin-bottom: 1rem; border: 1px solid #dee2e6;'>
+            <h4 style='margin: 0; color: #1f77b4;'>API Connection</h4>
+            <p style='margin: 0.5rem 0 0 0; color: #6c757d;'>
+                Configure your API connection details and parameters below.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    
+    # Create tabs for basic and advanced configuration
+    basic_tab, advanced_tab = st.tabs(["Basic Configuration", "Advanced Settings"])
+    
+    with basic_tab:
+        # URL and Method
+        col1, col2 = st.columns([3, 1])
         
-        if st.button("Connect", key=f"{prefix}_connect"):
+        with col1:
+            api_url = st.text_input(
+                "API URL",
+                key=f"{prefix}_api_url",
+                help="Enter the complete API endpoint URL",
+                placeholder="https://api.example.com/data"
+            )
+        
+        with col2:
+            method = st.selectbox(
+                "Method",
+                ["GET", "POST"],
+                key=f"{prefix}_method",
+                help="Select the HTTP method to use"
+            )
+    
+    with advanced_tab:
+        # Headers
+        st.markdown("##### Headers")
+        headers = st.text_area(
+            "Headers (JSON format)",
+            key=f"{prefix}_headers",
+            help="Enter headers as JSON object, e.g., {\"Authorization\": \"Bearer token\"}",
+            height=100,
+            placeholder="""
+{
+    "Authorization": "Bearer your_token",
+    "Content-Type": "application/json"
+}"""
+        )
+        
+        # Parameters
+        st.markdown("##### Parameters")
+        params = st.text_area(
+            "Parameters (JSON format)",
+            key=f"{prefix}_params",
+            help="Enter query parameters or POST body as JSON object",
+            height=100,
+            placeholder="""
+{
+    "limit": 1000,
+    "offset": 0
+}"""
+        )
+    
+    # Connection button with loading state
+    if st.button("🔌 Connect to API", key=f"{prefix}_connect", use_container_width=True):
+        with st.spinner("Connecting to API..."):
             try:
-                return APIFetcher.fetch_api_data(
+                # Validate inputs
+                if not api_url:
+                    st.error("❌ API URL is required")
+                    return None
+                
+                # Parse JSON inputs
+                try:
+                    headers_dict = eval(headers) if headers else None
+                    params_dict = eval(params) if params else None
+                except Exception as e:
+                    st.error(f"❌ Invalid JSON format: {str(e)}")
+                    return None
+                
+                # Fetch data
+                df = APIFetcher.fetch_api_data(
                     api_url=api_url,
                     method=method,
-                    headers=eval(headers) if headers else None,
-                    params=eval(params) if params else None
+                    headers=headers_dict,
+                    params=params_dict
                 )
+                
+                if df is not None:
+                    st.success("✅ API connection successful!")
+                    st.info(f"Retrieved {len(df)} rows and {len(df.columns)} columns")
+                    
+                    # Show data preview in an expander
+                    with st.expander("Data Preview"):
+                        st.dataframe(
+                            df.head(5),
+                            use_container_width=True,
+                            height=200
+                        )
+                    return df
+                else:
+                    st.error("❌ No data received from API")
+                    
             except Exception as e:
-                st.error(f"API connection error: {str(e)}")
+                st.error(f"❌ API connection error: {str(e)}")
+                log_error(f"API connection error: {str(e)}")
+                
+                # Show detailed error message in an expander
+                with st.expander("Error Details"):
+                    st.code(str(e))
     
     return None
 
 def show_column_mapping_interface(source_df: pd.DataFrame, target_df: pd.DataFrame):
     """Show interface for column mapping"""
     
-    st.markdown("### Column Mapping Configuration")
-    
-    # Add auto-map button
-    if st.button("Auto-Map Columns", key="auto_map_btn"):
-        st.session_state.column_mapping = MappingManager.auto_map_columns(source_df, target_df)
-        st.success("Columns automatically mapped!")
-    
-    # Show current mapping status
-    if st.session_state.column_mapping:
-        st.write(f"Currently mapped: {len(st.session_state.column_mapping)} columns")
+    if not isinstance(source_df, pd.DataFrame) or not isinstance(target_df, pd.DataFrame):
+        st.error("❌ Source or target data is not available for mapping")
+        return
         
-        # Create a DataFrame to display the mapping
-        mapping_data = []
-        for source_col in source_df.columns:
-            source_sample = str(source_df[source_col].head(2).tolist())
-            target_col = st.session_state.column_mapping.get(source_col, '')
-            target_sample = str(target_df[target_col].head(2).tolist()) if target_col else ''
-            
-            mapping_data.append({
-                'Source Column': source_col,
-                'Source Sample': source_sample,
-                'Target Column': target_col,
-                'Target Sample': target_sample,
-                'Mapped': '✓' if target_col else '✗'
-            })
-        
-        mapping_df = pd.DataFrame(mapping_data)
-        st.dataframe(mapping_df, use_container_width=True)
+    st.markdown(
+        """
+        <div style='background-color: #f8f9fa; padding: 1.5rem; border-radius: 10px; margin-bottom: 1rem; border: 1px solid #dee2e6;'>
+            <h3 style='margin: 0; color: #1f77b4;'>Column Mapping Configuration</h3>
+            <p style='margin: 0.5rem 0 0 0; color: #6c757d;'>
+                Map columns between source and target data sources. Use auto-mapping or manually adjust the mappings below.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
     
-    # Create three columns for the mapping interface
-    col1, col2, col3 = st.columns([2, 2, 1])
+    # Create tabs for auto and manual mapping
+    auto_tab, manual_tab = st.tabs(["Automatic Mapping", "Manual Mapping"])
     
-    with col1:
-        st.markdown("**Source Column**")
-    with col2:
-        st.markdown("**Target Column**")
-    with col3:
-        st.markdown("**Exclude**")
-
-    # Show mapping interface for each source column
-    for source_col in source_df.columns:
-        col1, col2, col3 = st.columns([2, 2, 1])
+    with auto_tab:
+        # Create two columns for the auto-map button and mapping status
+        col1, col2 = st.columns([1, 2])
         
         with col1:
-            st.text(source_col)
-            st.caption(f"Sample: {str(source_df[source_col].head(2).tolist())}")
+            if st.button("🔄 Auto-Map Columns", key="auto_map_btn", use_container_width=True):
+                with st.spinner("Mapping columns..."):
+                    try:
+                        st.session_state.column_mapping = MappingManager.auto_map_columns(source_df, target_df)
+                        if st.session_state.column_mapping:
+                            st.success(f"✅ Successfully mapped {len(st.session_state.column_mapping)} columns!")
+                        else:
+                            st.warning("⚠️ No automatic matches found. Please map columns manually.")
+                    except Exception as e:
+                        st.error(f"❌ Error during auto-mapping: {str(e)}")
         
         with col2:
-            # Dropdown for target column selection
-            current_mapping = st.session_state.column_mapping.get(source_col, '')
-            target_options = [''] + list(target_df.columns)
-            target_index = target_options.index(current_mapping) if current_mapping in target_options else 0
-            
-            target_col = st.selectbox(
-                f"Map to",
-                options=target_options,
-                index=target_index,
-                key=f"mapping_{source_col}"
-            )
-            
-            if target_col:
-                if target_col != current_mapping:
-                    st.session_state.column_mapping[source_col] = target_col
-                    # Show sample of selected target column
-                    st.caption(f"Sample: {str(target_df[target_col].head(2).tolist())}")
-            elif source_col in st.session_state.column_mapping:
-                del st.session_state.column_mapping[source_col]
+            if st.session_state.get('column_mapping'):
+                total_cols = len(source_df.columns)
+                mapped_cols = len(st.session_state.column_mapping)
+                mapping_percentage = (mapped_cols / total_cols) * 100
+                st.progress(mapping_percentage / 100, text=f"Mapped {mapped_cols} of {total_cols} columns ({mapping_percentage:.1f}%)")
+    
+    with manual_tab:
+        st.markdown("### Manual Column Mapping")
+        st.markdown("Select target columns for each source column below:")
         
-        with col3:
-            # Checkbox for excluding column from comparison
-            excluded = st.checkbox(
-                "Exclude",
-                key=f"exclude_{source_col}",
-                value=source_col in st.session_state.excluded_columns
-            )
+        # Initialize column mapping in session state if not exists
+        if 'column_mapping' not in st.session_state:
+            st.session_state.column_mapping = {}
+        
+        # Create mapping interface for each source column
+        for source_col in source_df.columns:
+            col1, col2 = st.columns([2, 3])
             
-            if excluded and source_col not in st.session_state.excluded_columns:
-                st.session_state.excluded_columns.append(source_col)
-            elif not excluded and source_col in st.session_state.excluded_columns:
-                st.session_state.excluded_columns.remove(source_col)
+            with col1:
+                st.markdown(f"**Source:** {source_col}")
+                st.caption(f"Sample: {str(source_df[source_col].head(2).tolist())}")
+            
+            with col2:
+                # Get current mapping for this column
+                current_mapping = st.session_state.column_mapping.get(source_col, '')
+                
+                # Create dropdown with target columns
+                target_options = [''] + list(target_df.columns)
+                selected_target = st.selectbox(
+                    "Map to target column",
+                    options=target_options,
+                    index=target_options.index(current_mapping) if current_mapping in target_options else 0,
+                    key=f"manual_mapping_{source_col}"
+                )
+                
+                # Update mapping if changed
+                if selected_target:
+                    if selected_target != current_mapping:
+                        st.session_state.column_mapping[source_col] = selected_target
+                        # Show sample of selected target column
+                        st.caption(f"Target sample: {str(target_df[selected_target].head(2).tolist())}")
+                elif source_col in st.session_state.column_mapping:
+                    del st.session_state.column_mapping[source_col]
+            
+            st.divider()
+        
+        # Show current mapping summary
+        if st.session_state.column_mapping:
+            st.success(f"✅ Currently mapped: {len(st.session_state.column_mapping)} columns")
+            with st.expander("View Current Mappings"):
+                for source_col, target_col in st.session_state.column_mapping.items():
+                    st.write(f"{source_col} → {target_col}")
+    
+    # Show mapping table with enhanced styling
+    st.markdown("### Current Mapping Overview")
+    
+    # Create a DataFrame to display the mapping
+    mapping_data = []
+    for source_col in source_df.columns:
+        source_sample = str(source_df[source_col].head(2).tolist())
+        target_col = st.session_state.column_mapping.get(source_col, '')
+        target_sample = str(target_df[target_col].head(2).tolist()) if target_col else ''
+        
+        mapping_data.append({
+            'Source Column': source_col,
+            'Source Sample': source_sample,
+            'Target Column': target_col,
+            'Target Sample': target_sample,
+            'Status': '✅' if target_col else '❌'
+        })
+    
+    mapping_df = pd.DataFrame(mapping_data)
+    
+    # Display the mapping table with custom styling
+    st.dataframe(
+        mapping_df,
+        use_container_width=True,
+        height=400,
+        column_config={
+            "Status": st.column_config.Column(
+                "Mapping Status",
+                help="✅: Mapped | ❌: Unmapped",
+                width="small"
+            )
+        }
+    )
 
 def perform_comparison():
     """Perform the comparison and generate reports"""
     
     try:
+        # Initial validation
+        if not isinstance(st.session_state.get('source_df'), pd.DataFrame):
+            st.error("❌ Source data is not available. Please load source data first.")
+            return
+            
+        if not isinstance(st.session_state.get('target_df'), pd.DataFrame):
+            st.error("❌ Target data is not available. Please load target data first.")
+            return
+            
+        if not st.session_state.get('column_mapping'):
+            st.error("❌ No column mappings defined. Please map columns before comparing.")
+            return
+            
+        # Validate column mappings
+        source_df = st.session_state.source_df
+        target_df = st.session_state.target_df
+        
+        invalid_mappings = []
+        for source_col, target_col in st.session_state.column_mapping.items():
+            if source_col not in source_df.columns:
+                invalid_mappings.append(f"Source column '{source_col}' not found")
+            if target_col not in target_df.columns:
+                invalid_mappings.append(f"Target column '{target_col}' not found")
+                
+        if invalid_mappings:
+            st.error("❌ Invalid column mappings detected:")
+            for msg in invalid_mappings:
+                st.write(f"- {msg}")
+            return
+            
         st.markdown("### Comparison Results")
         
-        # Create reports directory if it doesn't exist
-        os.makedirs("reports", exist_ok=True)
+        # Create reports directory with full path
+        reports_dir = os.path.join(os.getcwd(), "reports")
+        os.makedirs(reports_dir, exist_ok=True)
         timestamp = format_timestamp()
+        
+        # Log report generation start
+        st.info("📊 Generating comparison reports...")
         
         # Generate reports
         join_keys = st.session_state.get('join_keys', None)
@@ -370,8 +931,9 @@ def perform_comparison():
                     title="Source Data Profile Report",
                     minimal=True
                 )
-                source_html = f"reports/SourceProfile_{timestamp}.html"
+                source_html = os.path.join(reports_dir, f"SourceProfile_{timestamp}.html")
                 source_profile.to_file(source_html)
+                st.success("✅ Source profile report generated")
                 
                 # Target profiling
                 target_profile = ProfileReport(
@@ -379,8 +941,9 @@ def perform_comparison():
                     title="Target Data Profile Report",
                     minimal=True
                 )
-                target_html = f"reports/TargetProfile_{timestamp}.html"
+                target_html = os.path.join(reports_dir, f"TargetProfile_{timestamp}.html")
                 target_profile.to_file(target_html)
+                st.success("✅ Target profile report generated")
                 
                 # Generate other reports
                 st.write("Generating Comparison Reports...")
@@ -424,17 +987,27 @@ def perform_comparison():
                 # Display Y-Data Profiling Reports in expandable sections
                 st.subheader("Y-Data Profiling Reports")
 
-                # Generate comparison profile
+                # Generate comparison profile with side-by-side data
+                comparison_df = pd.DataFrame()
+                
+                # Process each column in the mapping
+                for source_col, target_col in st.session_state.column_mapping.items():
+                    if source_col in st.session_state.source_df.columns and target_col in st.session_state.target_df.columns:
+                        comparison_df[f'Source_{source_col}'] = st.session_state.source_df[source_col]
+                        comparison_df[f'Target_{target_col}'] = st.session_state.target_df[target_col]
+                
+                # Generate profile report with enhanced configuration
                 comparison_profile = ProfileReport(
-                    pd.concat([
-                        st.session_state.source_df.add_prefix('Source_'),
-                        st.session_state.target_df.add_prefix('Target_')
-                    ], axis=1),
+                    comparison_df,
                     title="Source vs Target Comparison Profile",
-                    minimal=True
+                    minimal=False,  # Use full report for more detailed comparison
+                    correlations={"cramers": True},  # Add correlation analysis
+                    vars={"num": {"low_categorical_threshold": 0}},  # Treat numeric columns as continuous
+                    interactions={"continuous": True}  # Show interactions between continuous variables
                 )
-                comparison_html = f"reports/ComparisonProfile_{timestamp}.html"
+                comparison_html = os.path.join(reports_dir, f"ComparisonProfile_{timestamp}.html")
                 comparison_profile.to_file(comparison_html)
+                st.success("✅ Comparison profile report generated")
 
                 # Generate DataCompy comparison report
                 try:
@@ -471,7 +1044,7 @@ def perform_comparison():
                         st.warning(f"Could not generate column statistics: {str(e)}")
 
                     # Generate HTML report
-                    datacompy_html = f"reports/DataCompyReport_{timestamp}.html"
+                    datacompy_html = os.path.join(reports_dir, f"DataCompyReport_{timestamp}.html")
                     with open(datacompy_html, 'w') as f:
                         f.write(f"""
                         <html>
