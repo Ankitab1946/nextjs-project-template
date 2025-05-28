@@ -234,93 +234,45 @@ class ReportGenerator:
                                output_path: str) -> None:
         """Generate pandas-based comparison report"""
         
-        # Prepare DataFrames with mapped columns
-        source_cols = list(column_mapping.keys())
-        target_cols = [column_mapping[col] for col in source_cols]
-        
-        if join_keys:
-            source_join_cols = [key[0] for key in join_keys]
-            target_join_cols = [key[1] for key in join_keys]
-        else:
-            # If no join keys, use index
-            source_df = source_df.copy()
-            target_df = target_df.copy()
-            source_df['_index'] = range(len(source_df))
-            target_df['_index'] = range(len(target_df))
-            source_join_cols = ['_index']
-            target_join_cols = ['_index']
-        
-        # Prepare DataFrames with mapped columns
-        source_compare_df = source_df[source_cols].copy()
-        target_compare_df = target_df[target_cols].copy()
-        
-        # Convert all columns to string type to avoid type comparison issues
-        source_compare_df = source_compare_df.astype(str)
-        target_compare_df = target_compare_df.astype(str)
-        
-        # Rename target columns to match source for proper comparison
-        target_compare_df.columns = source_cols
-        
-        # Initialize comparison results
-        comparison_results = {
-            'total_rows_source': len(source_compare_df),
-            'total_rows_target': len(target_compare_df),
-            'matching_rows': 0,
-            'source_only_rows': 0,
-            'target_only_rows': 0,
-            'differing_rows': 0,
-            'source_only_df': pd.DataFrame(),
-            'target_only_df': pd.DataFrame(),
-            'diff_df': pd.DataFrame()
-        }
-        
         try:
-            # Prepare join keys with type checking
-            valid_join_keys = []
+            # Prepare column lists
+            source_cols = list(column_mapping.keys())
+            target_cols = [column_mapping[col] for col in source_cols]
             
-            # Default to index-based comparison
-            source_compare_df['_index'] = range(len(source_compare_df))
-            target_compare_df['_index'] = range(len(target_compare_df))
-            valid_join_keys = ['_index']
+            # Create initial DataFrames
+            source_compare_df = source_df[source_cols].copy()
+            target_compare_df = target_df[target_cols].copy()
             
-            # Try to use provided join keys if available
-            if join_keys:
-                try:
-                    # Convert join_keys to list if it's not already
-                    join_key_list = list(join_keys) if isinstance(join_keys, (list, tuple)) else []
-                    
-                    temp_join_keys = []
-                    for key in join_key_list:
-                        if isinstance(key, (list, tuple)) and len(key) == 2:
-                            source_key = str(key[0])
-                            if source_key in source_compare_df.columns:
-                                # Convert columns to string and handle nulls
-                                source_compare_df[source_key] = source_compare_df[source_key].fillna('').astype(str)
-                                target_compare_df[source_key] = target_compare_df[source_key].fillna('').astype(str)
-                                temp_join_keys.append(source_key)
-                    
-                    # Only use custom join keys if valid ones were found
-                    if temp_join_keys:
-                        valid_join_keys = temp_join_keys
-                        # Remove index columns if we're using custom join keys
-                        if '_index' in source_compare_df.columns:
-                            source_compare_df.drop('_index', axis=1, inplace=True)
-                        if '_index' in target_compare_df.columns:
-                            target_compare_df.drop('_index', axis=1, inplace=True)
-                except Exception as e:
-                    print(f"Warning: Error processing join keys, falling back to index-based comparison: {str(e)}")
+            # Convert all columns to string type and handle nulls
+            for col in source_compare_df.columns:
+                source_compare_df[col] = source_compare_df[col].fillna('').astype(str)
+            for col in target_compare_df.columns:
+                target_compare_df[col] = target_compare_df[col].fillna('').astype(str)
             
-            try:
-                # Perform merge to find matching and non-matching rows
-                merged_df = pd.merge(
-                    source_compare_df,
-                    target_compare_df,
-                    on=valid_join_keys,
-                    how='outer',
-                    indicator=True
-                )
-            except Exception as e:
-                raise ValueError(f"Error performing merge operation: {str(e)}")
+            
+            # Rename target columns to match source
+            target_compare_df.columns = source_cols
+            
+            # Initialize comparison results
+            comparison_results = {
+                'total_rows_source': len(source_compare_df),
+                'total_rows_target': len(target_compare_df),
+                'matching_rows': 0,
+                'source_only_rows': 0,
+                'target_only_rows': 0,
+                'differing_rows': 0,
+                'source_only_df': pd.DataFrame(),
+                'target_only_df': pd.DataFrame(),
+                'diff_df': pd.DataFrame()
+            }
+            # Ensure join_keys is a list
+            join_key_list = []
+            if isinstance(join_keys, (list, tuple)):
+                join_key_list = join_keys
+            elif isinstance(join_keys, str):
+                join_key_list = [join_keys]
+                
+            # Filter valid join keys that exist in both DataFrames
             
             # Calculate comparison statistics
             comparison_results['source_only_df'] = merged_df[merged_df['_merge'] == 'left_only']
@@ -363,10 +315,28 @@ class ReportGenerator:
             col_stats = pd.DataFrame(stats_data)
             col_stats_html = col_stats.to_html(classes='table table-striped', index=False)
             
+            # Generate HTML report
         except Exception as e:
-            raise Exception(f"Error performing comparison: {str(e)}")
+            error_message = f"""
+            <!DOCTYPE html>
+            <html lang="en">
+            <head><title>Comparison Error Report</title></head>
+            <body>
+                <h1>Error Generating Comparison Report</h1>
+                <p>An error occurred: {str(e)}</p>
+                <p>Please check that:</p>
+                <ul>
+                    <li>All required columns exist in both datasets</li>
+                    <li>Join keys are valid column names</li>
+                    <li>Data types are compatible for comparison</li>
+                </ul>
+            </body>
+            </html>
+            """
+            with open(output_path, 'w') as f:
+                f.write(error_message)
+            raise Exception(f"Error generating comparison report: {str(e)}")
             
-        # Generate HTML report
         try:
             # Generate HTML for source-only records
             source_only_html = comparison_results['source_only_df'].to_html(
@@ -386,7 +356,7 @@ class ReportGenerator:
                 <!DOCTYPE html>
                 <html lang="en">
                 <head>
-                    <title>DataCompy Comparison Report</title>
+                    <title>Data Comparison Report</title>
                     <style>
                         body {{ font-family: Arial, sans-serif; margin: 20px; }}
                         .report {{ max-width: 1200px; margin: 0 auto; }}
@@ -400,7 +370,7 @@ class ReportGenerator:
                 </head>
                 <body>
                     <div class="report">
-                        <h1>DataCompy Comparison Report</h1>
+                        <h1>Data Comparison Report</h1>
                         <div class="section">
                             <h2>Summary</h2>
                             <pre>{summary}</pre>
@@ -445,4 +415,4 @@ class ReportGenerator:
                 </body>
                 </html>
                 """)
-            raise Exception(f"Error generating DataCompy report: {str(e)}")
+            raise Exception(f"Error generating comparison report: {str(e)}")
