@@ -17,7 +17,7 @@ from report_generator_new import (
     generate_side_by_side_report,
     zip_reports
 )
-from nextjs_geist_font_example_main.comparison_framework.mapping_manager import MappingManager
+from mapping_manager import MappingManager
 
 
 def init_session_state():
