@@ -2,7 +2,7 @@ import pyodbc
 import teradatasql
 from typing import Dict, Any
 
-class DBConnector:
+class DatabaseConnector:
     @staticmethod
     def connect_sql_server(conn_params: Dict[str, Any]):
         try:
